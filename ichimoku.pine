@@ -1,0 +1,53 @@
+//@version=5
+indicator("Ichimoku N/V/E Signal (修正版) - 修正済み", overlay=true)
+
+// ===== パラメータ設定 =====
+lenA = input.int(20, title="安値起点を探す期間")
+lenB = input.int(20, title="起点以降の高値期間")
+
+// ===== A点（安値）の検出 =====
+// 過去lenA本の中での最安値のバーオフセットと価格を取得
+a_offset    = ta.lowestbars(low, lenA)
+new_a_index = bar_index - a_offset
+new_a_price = ta.lowest(low, lenA)  // low[a_offset] の代わりにta.lowest()を利用
+
+// ===== A点・B点・ウィンドウ管理用の変数 =====
+var float a_price = na    // A点の価格
+var int   a_index = na    // A点が発生したバーのインデックス
+var float b_price = na    // A点以降のB点（高値）の更新用
+var int   windowCount = 0 // A点検出後のバー数カウント
+
+// ===== A点の更新とウィンドウのリセット =====
+if na(a_index) or (new_a_index != a_index)
+    // 新たなA点が検出された場合、ウィンドウをリセット
+    a_index     := new_a_index
+    a_price     := new_a_price
+    b_price     := high      // ウィンドウ開始時は当バーの高値で初期化
+    windowCount := 0
+else if (bar_index >= a_index)
+    // A点が継続している場合、ウィンドウ内でB点（高値）を更新
+    if windowCount < lenB
+        b_price     := math.max(b_price, high)
+        windowCount += 1
+
+// ===== シグナルの計算 =====
+var float n_value = na
+var float v_value = na
+var float e_value = na
+
+if windowCount >= lenB
+    // A点からウィンドウ期間が完了したらシグナルを確定
+    ab_range = b_price - a_price
+    n_value  := b_price + ab_range
+    v_value  := a_price - ab_range
+    e_value  := (n_value + v_value) / 2
+
+// ===== プロット =====
+plot(n_value, title="N Value", color=color.green, linewidth=2)
+plot(v_value, title="V Value", color=color.red, linewidth=2)
+plot(e_value, title="E Value", color=color.blue, linewidth=2)
+
+// ===== デバッグ用プロット =====
+// A点とB点の位置が分かるように補助的にプロット
+plot(a_price, title="A Point", color=color.yellow, style=plot.style_circles, linewidth=2)
+plot(b_price, title="B Point", color=color.purple, style=plot.style_circles, linewidth=2)
